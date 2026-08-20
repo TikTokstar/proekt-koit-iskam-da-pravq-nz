@@ -613,6 +613,18 @@ function stem(s){
   const t = s.replace(END, "");
   return t.length >= 3 ? t : s;
 }
+/* Понякога окончанията са две: „кебапчета“ = кебапче + та + е.
+   Затова махаме до два пъти и пазим всяка от стъпките. */
+function stemSteps(s){
+  const out = [];
+  let t = s;
+  for(let i = 0; i < 2; i++){
+    const n = t.replace(END, "");
+    if(n === t || n.length < 3) break;
+    out.push(n); t = n;
+  }
+  return out;
+}
 
 /* колко сгрешени букви прощаваме — по-късите думи са по-строги,
    иначе „може“ би минало за „море“ */
@@ -695,7 +707,7 @@ function prep(entry){
   const skels = [...new Set(all.map(skel).filter(x => x.length >= 1))];
   // окончанието се маха само от по-дълги думи — иначе „яко“ и „яке“
   // остават с един и същ корен и играта почва да бърка
-  const stems = [...new Set(skels.filter(x => x.length >= 4).map(stem).filter(x => x.length >= 3))];
+  const stems = [...new Set(skels.filter(x => x.length >= 4).flatMap(stemSteps))];
   return { shown, skels, stems };
 }
 
@@ -718,7 +730,7 @@ function findWord(text, slots){
     const g = skel(c);
     if(g.length < 2) continue;
     const isStop = STOP.has(g);
-    const gs = stem(g);
+    const gsList = stemSteps(g);
 
     for(const t of open){
       for(const s of t.skels){
@@ -727,14 +739,21 @@ function findWord(text, slots){
         const a = allow(Math.max(s.length, g.length));
         if(a > 0){ const d = dist(g, s, a); if(d <= a) consider(t.idx, d, false); }
       }
-      // различно окончание: „ябълки“, „ябълката“, „бананът“.
-      // Тук се иска точно съвпадение на корена — да се прощават и
-      // окончание, и сбъркани букви наведнъж води до бъркотия.
-      if(isStop || g.length < 4 || gs.length < 3) continue;
-      // самата дума, с махнато окончание от написаното: „кучета“ → „куче“
-      for(const s of t.skels) if(gs === s){ consider(t.idx, 0.5, false); break; }
-      // или и двете с махнати окончания: „ябълки“ и „ябълката“ → „ябълк“
-      for(const s of t.stems) if(gs === s){ consider(t.idx, 0.5, false); break; }
+      // Различно окончание: „ябълки“, „ябълката“, „бананът“, „кучета“.
+      if(isStop || g.length < 4 || !gsList.length) continue;
+      for(const gs of gsList){
+        // написаното без окончание съвпада със самата дума: „кучета“ → „куче“
+        if(t.skels.includes(gs)){ consider(t.idx, 0.5, false); continue; }
+        // или и двете без окончание: „ябълки“ и „ябълката“ → „ябълк“
+        if(t.stems.includes(gs)){ consider(t.idx, 0.5, false); continue; }
+        // и сбъркана буква, и друго окончание наведнъж — но само при
+        // достатъчно дълги корени, иначе почват случайни попадения
+        if(gs.length < 5) continue;
+        for(const s of t.stems){
+          if(s.length < 5) continue;
+          if(dist(gs, s, 1) <= 1){ consider(t.idx, 1.5, false); break; }
+        }
+      }
     }
   }
   return best && !tie ? best : null;
