@@ -1,0 +1,50 @@
+# Качва играта на постоянен адрес (GitHub Pages) при всяко обновяване.
+#
+#   https://tiktokstar.github.io/proekt-koit-iskam-da-pravq-nz/
+#
+# Горе се качват само index.html и words.js — това е цялата игра.
+# Сървърът и .bat файловете нямат работа там: TikTok чатът минава
+# единствено през твоя компютър.
+
+name: Линк за играта
+
+on:
+  push:
+    branches: [claude/guess-5-game-59p3ob]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# ако бутнеш два пъти бързо, второто изчаква първото
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # enablement:true пуска Pages само, ако още не е пуснато
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Само играта
+        run: |
+          mkdir -p _site
+          cp index.html words.js _site/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
