@@ -183,6 +183,12 @@ body{
 .go:hover{transform:translateY(-2px); box-shadow:0 1.8vmin 4vmin rgba(255,180,63,.36)}
 .go:active{transform:translateY(0)}
 
+/* Отворено без сървър (публичният линк) — там няма как да се чете
+   TikTok чат, затова панелът се маха и остава чиста игра за сам човек. */
+#soloNote{display:none}
+body.solo #ttBlock{display:none}
+body.solo #soloNote{display:block}
+
 #autoNote{display:none; text-align:center; font-size:clamp(9px,1.5vmin,14px); color:var(--faint)}
 #autoNote a{color:var(--gold); cursor:pointer; text-decoration:underline}
 
@@ -433,16 +439,16 @@ body.tt #solo{display:none}
   <!-- ============ СТАРТ ============ -->
   <section id="screen-start" class="screen show">
     <div class="brand">
-      <div class="kicker">Игра за TikTok LIVE</div>
+      <div class="kicker" id="kicker">Игра за TikTok LIVE</div>
       <div class="logo">ПОЗНАЙ&nbsp;5</div>
-      <div class="tagline">
+      <div class="tagline" id="tagline">
         Пет скрити думи по една тема. Зрителите просто пишат думата в чата —
         играта разпознава и сгрешено, и на латиница, и близка дума.
       </div>
       <div class="counter">
         <span class="pill">📚 <b id="cTheme">0</b> теми</span>
         <span class="pill">🔤 <b id="cWord">0</b> думи</span>
-        <span class="pill">💬 пише се в чата</span>
+        <span class="pill" id="pillHow">💬 пише се в чата</span>
       </div>
     </div>
 
@@ -475,7 +481,7 @@ body.tt #solo{display:none}
         </div>
       </div>
 
-      <div>
+      <div id="ttBlock">
         <h3>TikTok LIVE</h3>
         <div class="field">
           <input id="ttUser" placeholder="твоето име в TikTok, без @" autocomplete="off" spellcheck="false">
@@ -484,6 +490,10 @@ body.tt #solo{display:none}
         <div class="hint" id="ttStatus" style="margin-top:.7vmin">
           Пусни LIVE, напиши името си и натисни „Свържи“. Без TikTok играта пак работи — пишеш в полето долу.
         </div>
+      </div>
+
+      <div class="hint" id="soloNote">
+        Щом играта почне, пишеш думите в полето долу вляво.
       </div>
 
       <button class="go" id="btnStart">ЗАПОЧНИ</button>
@@ -1152,6 +1162,8 @@ function paintLive(){
 /* Връзката със сървъра се вдига веднага при отваряне на страницата, а не
    чак при цъкане на „Свържи“. Иначе прозорчето в TikTok Studio, където
    никой не цъка, никога не научава нито настройките, нито че има стрийм. */
+let ttTries = 0, everServer = false, ttRetry = null;
+
 function ttOpen(then){
   if(TT.ws && (TT.ws.readyState === 0 || TT.ws.readyState === 1)){
     if(then) TT.ws.readyState === 1 ? then() : TT.ws.addEventListener("open", then, {once:true});
@@ -1160,11 +1172,12 @@ function ttOpen(then){
 
   let ws;
   try{ ws = new WebSocket(TT_URL); }
-  catch(e){ ttSet("Сървърът не е пуснат. Затвори това и пусни START.bat.", "bad"); return; }
+  catch(e){ goSolo(); return; }
   TT.ws = ws;
 
   ws.onopen = () => {
-    TT.server = true;
+    TT.server = true; everServer = true; ttTries = 0;
+    leaveSolo();
     armAutostart();            // само нашият сървър може да отвори тази връзка
     paintLive();
     if(then) then();
@@ -1197,7 +1210,39 @@ function ttOpen(then){
     TT.ws = null; TT.live = false; TT.server = false;
     $("#ttBtn").textContent = "Свържи";
     paintLive();
+    goSolo();
+    /* Домакинът може да е спрял и пуснал сървъра наново, а прозорчето в
+       TikTok Studio никой няма да презарежда — затова опитваме пак.
+       През публичния линк сървър няма и след няколко опита спираме. */
+    clearTimeout(ttRetry);
+    if(everServer || ++ttTries <= 3) ttRetry = setTimeout(() => ttOpen(), 5000);
   };
+}
+
+/* Няма сървър: това е публичният линк или някой е затворил черния
+   прозорец. И в двата случая играта продължава — само сама. Затова
+   и надписите спират да говорят за чат, който го няма. */
+const SAID = {
+  kicker:  $("#kicker").textContent,
+  tagline: $("#tagline").innerHTML,
+  pill:    $("#pillHow").innerHTML
+};
+function goSolo(){
+  if(document.body.classList.contains("solo")) return;
+  document.body.classList.add("solo");
+  $("#kicker").textContent = "Игра с думи";
+  $("#tagline").textContent =
+    "Пет скрити думи по една тема. Пишеш ги в полето долу — играта " +
+    "разпознава и сгрешено, и на латиница, и близка дума.";
+  $("#pillHow").innerHTML = "⌨️ пишеш ти";
+  ttSet("Играта работи и без TikTok — пишеш думите сам.");
+}
+function leaveSolo(){
+  if(!document.body.classList.contains("solo")) return;
+  document.body.classList.remove("solo");
+  $("#kicker").textContent  = SAID.kicker;
+  $("#tagline").innerHTML   = SAID.tagline;
+  $("#pillHow").innerHTML   = SAID.pill;
 }
 
 function ttConnect(){
