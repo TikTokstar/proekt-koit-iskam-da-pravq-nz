@@ -313,7 +313,8 @@ body.tt .live{display:flex}
   opacity:0; transition:opacity .3s ease .25s;
   pointer-events:none;
 }
-.wrow.done .by{opacity:1}
+.wrow.done .by, .wrow.miss .by{opacity:1}
+.wrow.miss .by{color:var(--bad)}
 /* точките са по-важни от името — тях никога не ги режем */
 .by .nk{overflow:hidden; text-overflow:ellipsis; min-width:0}
 .by .pts{flex:0 0 auto; color:var(--gold)}
@@ -377,6 +378,7 @@ body.tt #solo{display:none}
   animation:toast 2.6s cubic-bezier(.2,.9,.25,1) both;
 }
 .toast.near{background:linear-gradient(120deg,rgba(255,210,103,.96),rgba(255,170,50,.96)); color:#2e2205}
+.toast.miss{background:linear-gradient(120deg,rgba(255,93,108,.96),rgba(214,58,74,.96)); color:#fff}
 @keyframes toast{
   0%{opacity:0; transform:translateY(-1.4vmin) scale(.94)}
   10%{opacity:1; transform:none}
@@ -939,6 +941,12 @@ function fillRow(s, cls){
                    '<span class="pts">+' + s.pts + "</span>";
     sizeBadge(row);
   }
+  // без това червените редове изглеждат така, сякаш играта сама си
+  // е попълнила думата
+  if(cls === "miss"){
+    by.innerHTML = '<span class="nk">никой</span>';
+    sizeBadge(row);
+  }
 }
 
 /* Името стои плътно до последното квадратче, така че свободното място
@@ -1015,6 +1023,8 @@ function endRound(cleared){
     toast("🎉 Цялата дъска е позната!", "");
   }else{
     sfx.fail();
+    toast(cfg.time ? "⏰ Времето свърши — ето ги думите"
+                   : "Ето ги думите", "miss");
   }
 
   const wait = cleared ? 3800 : 5200;
